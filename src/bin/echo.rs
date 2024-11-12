@@ -1,3 +1,4 @@
+use ds_challenge::*;
 use std::io::{StdoutLock, Write};
 
 use anyhow::{bail, Context};
@@ -5,14 +6,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 
 //basic skeleton of a network message
-struct Message {
+struct Message<Payload> {
     src: String,
     dest: String,
-    body: Body,
+    body: Body<Payload>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body {
+struct Body<Payload> {
     // #[serde(rename = "type")]
     // ty: String,
     #[serde(rename = "msg_id")]
@@ -28,7 +29,7 @@ struct Body {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 
-//what type fo message
+//what type of message
 enum Payload {
     Echo {
         echo: String,
@@ -49,8 +50,12 @@ struct EchoNode {
 }
 
 //handle basic echo responses
-impl EchoNode {
-    pub fn handle_input(&mut self, input: Message, output: &mut StdoutLock) -> anyhow::Result<()> {
+impl Node<Payload> for EchoNode {
+    fn handle_input(
+        &mut self,
+        input: ds_challenge::Message<Payload>,
+        output: &mut StdoutLock,
+    ) -> anyhow::Result<()> {
         match input.body.payload {
             //initialization message
             Payload::Init { .. } => {
@@ -89,19 +94,5 @@ impl EchoNode {
     }
 }
 fn main() -> anyhow::Result<()> {
-    //configure io with serde
-    let stdin = std::io::stdin().lock();
-    let inputs = serde_json::Deserializer::from_reader(stdin).into_iter::<Message>();
-
-    let mut stdout = std::io::stdout().lock();
-    // let mut output = serde_json::Serializer::new(stdout);
-
-    //set up initial state
-    let mut state = EchoNode { id: 0 };
-    //handle every input read from STDIN
-    for input in inputs {
-        let input = input.context("input from stdin could  not be deserialized")?;
-        state.handle_input(input, &mut stdout)?;
-    }
-    Ok(())
+    main_loop(EchoNode { id: 0 })
 }

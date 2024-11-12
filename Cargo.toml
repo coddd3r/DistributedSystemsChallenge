@@ -1,5 +1,5 @@
 [package]
-name = "DS_CHALLENGE"
+name = "ds_challenge"
 version = "0.1.0"
 edition = "2021"
 
