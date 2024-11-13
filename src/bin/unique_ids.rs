@@ -1,12 +1,12 @@
 use ds_challenge::*;
-use ulid::Ulid;
 use std::io::{StdoutLock, Write};
+// use ulid::Ulid;
 
 use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Clone, Serialize, Deserialize)]
 
 //basic skeleton of a network message
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Message<Payload> {
     src: String,
     dest: String,
@@ -24,56 +24,47 @@ struct Body<Payload> {
     payload: Payload,
 }
 
+//what type of message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-//what type of message
 enum Payload {
     Generate,
-
     GenerateOk {
         #[serde(rename = "id")]
         guid: String,
     },
-    Init {
-        node_id: String,
-        node_ids: Vec<String>,
-    },
-    InitOk,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct UniqueNode {
+    node: String,
     id: usize,
 }
 
 //handle basic Generate responses
-impl Node<Payload> for UniqueNode {
+impl Node<(), Payload> for UniqueNode {
+    fn from_init(_state: (), init: Init) -> anyhow::Result<Self>
+    where
+        Self: Sized,
+    {
+        Ok(UniqueNode {
+            node: init.node_id,
+            id: 1,
+        })
+    }
     fn handle_input(
         &mut self,
         input: ds_challenge::Message<Payload>,
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
         match input.body.payload {
-            //initialization message
-            Payload::Init { .. } => {
-                let reply = Message {
-                    src: input.dest,
-                    dest: input.src,
-                    body: Body {
-                        id: Some(self.id),
-                        in_reply_to: input.body.id,
-                        payload: Payload::InitOk,
-                    },
-                };
-                serde_json::to_writer(&mut *output, &reply)?;
-                output.write_all(b"\n").context("write trailing newline")?;
-            }
-            Payload::InitOk { .. } => bail!("receievec init ok message"),
-            //
             //respond to a client
             Payload::Generate {} => {
-                let guid = Ulid::new().to_string();
+                // let guid = Ulid::new().to_string();
+                //{node-id}-{message_id} should always be unique
+                //assumes nodes do not reuse node-ids on restart
+                let guid = format!("{}-{}", self.node, self.id);
                 let reply = Message {
                     src: input.dest,
                     dest: input.src,
@@ -85,6 +76,7 @@ impl Node<Payload> for UniqueNode {
                 };
                 serde_json::to_writer(&mut *output, &reply)?;
                 output.write_all(b"\n").context("write trailing newline")?;
+                self.id += 1;
             }
             Payload::GenerateOk { .. } => bail!("receievec generate ok message"),
         }
@@ -93,5 +85,6 @@ impl Node<Payload> for UniqueNode {
     }
 }
 fn main() -> anyhow::Result<()> {
-    main_loop(UniqueNode { id: 0 })
+    //'_' represent unused state and payload generics for <S, N, P>
+    main_loop::<_, UniqueNode, _>(())
 }
