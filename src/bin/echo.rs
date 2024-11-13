@@ -27,7 +27,6 @@ struct Body<Payload> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-
 //what type of message
 enum Payload {
     Echo { echo: String },

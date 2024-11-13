@@ -14,6 +14,23 @@ pub struct Message<Payload> {
     pub body: Body<Payload>,
 }
 
+impl<Payload> Message<Payload> {
+    pub fn derive_response(self, id: Option<&mut usize>) -> Self {
+        Self {
+            src: self.dest,
+            dest: self.src,
+            body: Body {
+                id: id.map(|id| {
+                    let mid = *id;
+                    *id += 1;
+                    mid
+                }),
+                in_reply_to: self.body.id,
+                payload: self.body.payload,
+            },
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Body<Payload> {
     #[serde(rename = "msg_id")]
@@ -90,6 +107,7 @@ where
         },
     };
     serde_json::to_writer(&mut stdout, &reply).context("serialize response to init")?;
+    //flush STDOUT with a new line
     stdout.write_all(b"\n").context("write extra newline")?;
 
     //handle every input read from STDIN

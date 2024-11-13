@@ -36,6 +36,7 @@ enum Payload {
     },
 }
 
+//node representing unique id
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct UniqueNode {
     node: String,
@@ -48,7 +49,7 @@ impl Node<(), Payload> for UniqueNode {
     where
         Self: Sized,
     {
-        Ok(UniqueNode {
+        Ok(Self {
             node: init.node_id,
             id: 1,
         })
@@ -59,7 +60,7 @@ impl Node<(), Payload> for UniqueNode {
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
         match input.body.payload {
-            //respond to a client
+            //generate a unique id for a message
             Payload::Generate {} => {
                 // let guid = Ulid::new().to_string();
                 //{node-id}-{message_id} should always be unique
