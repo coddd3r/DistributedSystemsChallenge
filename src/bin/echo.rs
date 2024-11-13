@@ -51,19 +51,12 @@ impl Node<(), Payload> for EchoNode {
         input: ds_challenge::Message<Payload>,
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
-        match input.body.payload {
+        let mut response = input.derive_response(Some(&mut self.id));
+        match response.body.payload {
             //respond to a client
             Payload::Echo { echo } => {
-                let reply = Message {
-                    src: input.dest,
-                    dest: input.src,
-                    body: Body {
-                        id: Some(self.id),
-                        in_reply_to: input.body.id,
-                        payload: Payload::EchoOk { echo },
-                    },
-                };
-                serde_json::to_writer(&mut *output, &reply)?;
+                response.body.payload = Payload::EchoOk { echo };
+                serde_json::to_writer(&mut *output, &response)?;
                 output.write_all(b"\n").context("write trailing newline")?;
             }
             Payload::EchoOk { .. } => {}

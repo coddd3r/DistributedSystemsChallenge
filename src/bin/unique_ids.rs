@@ -1,6 +1,5 @@
 use ds_challenge::*;
 use std::io::{StdoutLock, Write};
-// use ulid::Ulid;
 
 use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
@@ -59,27 +58,21 @@ impl Node<(), Payload> for UniqueNode {
         input: ds_challenge::Message<Payload>,
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
-        match input.body.payload {
+        let mut response = input.derive_response(Some(&mut self.id));
+
+        match response.body.payload {
             //generate a unique id for a message
             Payload::Generate {} => {
-                // let guid = Ulid::new().to_string();
-                //{node-id}-{message_id} should always be unique
+                //{producer(node)-name/id}-{message_id} should always be unique
                 //assumes nodes do not reuse node-ids on restart
-                let guid = format!("{}-{}", self.node, self.id);
-                let reply = Message {
-                    src: input.dest,
-                    dest: input.src,
-                    body: Body {
-                        id: Some(self.id),
-                        in_reply_to: input.body.id,
-                        payload: Payload::GenerateOk { guid },
-                    },
+                response.body.payload = Payload::GenerateOk {
+                    guid: format!("{}-{}", self.node, self.id),
                 };
-                serde_json::to_writer(&mut *output, &reply)?;
+                serde_json::to_writer(&mut *output, &response)?;
                 output.write_all(b"\n").context("write trailing newline")?;
                 self.id += 1;
             }
-            Payload::GenerateOk { .. } => bail!("receievec generate ok message"),
+            Payload::GenerateOk { .. } => bail!("receieved generate ok message"),
         }
 
         Ok(())
