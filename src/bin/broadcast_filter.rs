@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
 //what type of message
@@ -128,13 +129,20 @@ impl Node<(), Payload, InjectedPayload> for BroadcastNode {
                 InjectedPayload::Gossip => {
                     for n in &self.neighbourhood {
                         let known_messages = &self.known[n];
-                        let notify_of = self
+                        let (already_known, mut notify_of): (HashSet<_>, HashSet<_>) = self
                             .messages
                             .iter()
                             .copied()
-                            .filter(|m| !known_messages.contains(m))
-                            .collect();
+                            .partition(|m| !known_messages.contains(m));
+                        // .collect();
 
+                        let mut rng = rand::thread_rng();
+                        notify_of.extend(already_known.iter().filter(|_| {
+                            // rng.gen_bool(0.1)
+                            let num_known = already_known.len() as u32;
+                            //return a  bool with probability of (numerator/denominator) being true
+                            rng.gen_ratio(10.min(num_known), num_known)
+                        }));
                         let msg: Message<Payload> = Message {
                             src: self.node.clone(),
                             dest: n.clone(),
