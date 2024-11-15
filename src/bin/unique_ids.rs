@@ -1,28 +1,10 @@
 use ds_challenge::*;
-use std::io::{StdoutLock, Write};
+use std::io::StdoutLock;
 
 use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
 
-//basic skeleton of a network message
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Message<Payload> {
-    src: String,
-    dest: String,
-    body: Body<Payload>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body<Payload> {
-    #[serde(rename = "msg_id")]
-    id: Option<usize>,
-    in_reply_to: Option<usize>,
-
-    //type of message
-    #[serde(flatten)]
-    payload: Payload,
-}
-
+//
 //what type of message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -44,7 +26,11 @@ struct UniqueNode {
 
 //handle basic Generate responses
 impl Node<(), Payload> for UniqueNode {
-    fn from_init(_state: (), init: Init) -> anyhow::Result<Self>
+    fn from_init(
+        _state: (),
+        init: Init,
+        _tx: std::sync::mpsc::Sender<Event<Payload>>,
+    ) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
@@ -53,11 +39,15 @@ impl Node<(), Payload> for UniqueNode {
             id: 1,
         })
     }
+
     fn handle_input(
         &mut self,
-        input: ds_challenge::Message<Payload>,
+        input: ds_challenge::Event<Payload>,
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
+        let Event::Message(input) = input else {
+            panic!("got unexpected injected event")
+        };
         let mut response = input.derive_response(Some(&mut self.id));
 
         match response.body.payload {
@@ -68,17 +58,19 @@ impl Node<(), Payload> for UniqueNode {
                 response.body.payload = Payload::GenerateOk {
                     guid: format!("{}-{}", self.node, self.id),
                 };
-                serde_json::to_writer(&mut *output, &response)?;
-                output.write_all(b"\n").context("write trailing newline")?;
-                self.id += 1;
+                response
+                    .send_self(&mut *output)
+                    .context("respond to generate unique id message")?;
             }
+
             Payload::GenerateOk { .. } => bail!("receieved generate ok message"),
         }
 
         Ok(())
     }
 }
+
 fn main() -> anyhow::Result<()> {
     //'_' represent unused state and payload generics for <S, N, P>
-    main_loop::<_, UniqueNode, _>(())
+    main_loop::<_, UniqueNode, _, _>(())
 }

@@ -11,8 +11,7 @@ let mut response = input.derive_response(Some(&mut self.id));
                 response.body.payload = Payload::GenerateOk {
                     guid: format!(
                         "{}-{}",
-                        self.node,
-                        self.id
+                        self.id,
                     ),
                 };
                 serde_json::to_writer(&mut *output, &response)?;

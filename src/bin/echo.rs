@@ -1,28 +1,8 @@
 use ds_challenge::*;
-use std::io::{StdoutLock, Write};
+use std::io::StdoutLock;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Clone, Serialize, Deserialize)]
-
-//basic skeleton of a network message
-struct Message<Payload> {
-    src: String,
-    dest: String,
-    body: Body<Payload>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Body<Payload> {
-    //message may have an id or not
-    #[serde(rename = "msg_id")]
-    id: Option<usize>,
-    in_reply_to: Option<usize>,
-
-    //type of message
-    #[serde(flatten)]
-    payload: Payload,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -40,24 +20,33 @@ struct EchoNode {
 
 //handle basic echo responses
 impl Node<(), Payload> for EchoNode {
-    fn from_init(_state: (), _init: ds_challenge::Init) -> anyhow::Result<Self>
+    fn from_init(
+        _state: (),
+        _init: ds_challenge::Init,
+        _tx: std::sync::mpsc::Sender<Event<Payload>>,
+    ) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
         Ok(EchoNode { id: 1 })
     }
+
     fn handle_input(
         &mut self,
-        input: ds_challenge::Message<Payload>,
+        input: ds_challenge::Event<Payload>,
         output: &mut StdoutLock,
     ) -> anyhow::Result<()> {
+        let Event::Message(input) = input else {
+            panic!("got unexpected injected event")
+        };
         let mut response = input.derive_response(Some(&mut self.id));
         match response.body.payload {
             //respond to a client
             Payload::Echo { echo } => {
                 response.body.payload = Payload::EchoOk { echo };
-                serde_json::to_writer(&mut *output, &response)?;
-                output.write_all(b"\n").context("write trailing newline")?;
+                response
+                    .send_self(&mut *output)
+                    .context("respond to echo message")?;
             }
             Payload::EchoOk { .. } => {}
         }
@@ -65,7 +54,8 @@ impl Node<(), Payload> for EchoNode {
         Ok(())
     }
 }
+
 fn main() -> anyhow::Result<()> {
-    //'_' represent unused state and payload generics
-    main_loop::<_, EchoNode, _>(())
+    //'_' represent unused state,payload and injected-payload generics
+    main_loop::<_, EchoNode, _, _>(())
 }
