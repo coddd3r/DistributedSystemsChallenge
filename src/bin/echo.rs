@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 enum Payload {
     Echo { echo: String },
     EchoOk { echo: String },
-}
+    }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EchoNode {

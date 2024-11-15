@@ -14,7 +14,7 @@ enum Payload {
     GenerateOk {
         #[serde(rename = "id")]
         guid: String,
-    },
+        },
 }
 
 //node representing unique id
