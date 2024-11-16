@@ -121,6 +121,7 @@ where
         panic!("NO INIT MESSAGE RECEIVED");
     };
 
+    // println!("init : {:?}", &init);
     let mut node: N =
         Node::from_init(initial_state, init, tx.clone()).context("node initialization failed")?;
 
