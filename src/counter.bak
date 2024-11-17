@@ -47,7 +47,7 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
     {
         //add thread to gossip lates counter value
         std::thread::spawn(move || loop {
-            std::thread::sleep(Duration::from_millis(500)); //play around with gossip interval
+            std::thread::sleep(Duration::from_millis(100));
             if let Err(_) = tx.send(Event::Injected(InjectedPayload::Gossip)) {
                 break;
             }
@@ -98,7 +98,6 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
                             }
                         }
                     }
-
                     Payload::Add { delta } => {
                         response.body.payload = Payload::AddOk;
                         self.value += delta;
@@ -108,6 +107,7 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
 
                         *self.latest_values.entry(self.node.clone()).or_insert(0) += delta;
                     }
+                    Payload::AddOk => {}
 
                     Payload::Read => {
                         let cumulative: usize = self.latest_values.clone().into_values().sum();
@@ -115,20 +115,20 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
                         response.send_self(&mut *output).context("read failure")?
                     }
 
-                    Payload::AddOk | Payload::ReadOk { .. } => {}
+                    Payload::ReadOk { .. } => {}
                 }
             }
 
             Event::Injected(payload) => match payload {
                 InjectedPayload::Gossip => {
                     for n in &self.initial_nodes {
-                        // if n == &self.node {
-                        //     eprintln!(
-                        //         "found self! {n}, {}, curr nodes: {:?}",
-                        //         &self.node, self.initial_nodes
-                        //     );
-                        //     continue;
-                        // }
+                        if n == &self.node {
+                            eprintln!(
+                                "found self! {n}, {}, curr nodes: {:?}",
+                                &self.node, self.initial_nodes
+                            );
+                            // continue;
+                        }
 
                         let msg: Message<Payload> = Message {
                             src: self.node.clone(),
@@ -137,6 +137,7 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
                                 id: Some(self.id),
                                 in_reply_to: None,
                                 payload: Payload::Gossip {
+                                    // latest: self.value,
                                     latest_values: self.latest_values.clone(),
                                 },
                             },
