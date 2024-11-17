@@ -68,7 +68,7 @@ impl Node<(), Payload, InjectedPayload> for CounterNode {
     }
 
     fn handle_input(
-        &mut self,
+            &mut self,
         input: Event<Payload, InjectedPayload>,
         output: &mut std::io::StdoutLock,
     ) -> anyhow::Result<()> {

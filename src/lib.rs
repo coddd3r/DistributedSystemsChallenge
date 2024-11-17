@@ -167,7 +167,7 @@ where
     handle
         .join()
         .expect("stdin thread panicked")
-        .context("stding thread erred")?;
+        .context("STDIN thread erred")?;
 
     Ok(())
 }
