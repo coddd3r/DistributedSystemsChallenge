@@ -2,7 +2,11 @@ use ds_challenge::*;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hasher,
+    time::Duration,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -20,6 +24,7 @@ enum Payload {
     },
     PollOk {
         msgs: HashMap<String, Vec<(usize, usize)>>,
+        // msgs: HashMap<String, Vec<usize>>,
         // msgs: HashMap<String, HashSet<(usize, usize)>>,
     },
     CommitOffsets {
@@ -32,52 +37,102 @@ enum Payload {
     ListCommittedOffsetsOk {
         offsets: HashMap<String, usize>,
     },
+    Gossip {
+        // history: HashMap<String, Vec<(usize, usize)>>,
+        history: HashMap<String, HashSet<usize>>,
+        // history: HashMap<String, Vec<usize>>,
+    },
+}
+
+enum InjectedPayload {
+    Gossip,
 }
 
 struct LogNode {
-    // node: String,
+    node: String,
     id: usize,
     // log: HashMap<String, usize>,
-    log: HashMap<String, Vec<(usize, usize)>>,
+    // log: HashMap<String, Vec<(usize, usize)>>,
+    // log: HashMap<String, Vec<usize>>,
+    log: HashMap<String, HashSet<usize>>,
     count: usize,
+    initial_nodes: Vec<String>,
     committed_offsets: HashMap<String, usize>,
 }
 
-impl Node<(), Payload> for LogNode {
+impl Node<(), Payload, InjectedPayload> for LogNode {
     fn from_init(
         _state: (),
-        _init: Init,
-        _inject: std::sync::mpsc::Sender<Event<Payload, ()>>,
+        init: Init,
+        tx: std::sync::mpsc::Sender<Event<Payload, InjectedPayload>>,
     ) -> anyhow::Result<Self>
     where
         Self: Sized,
     {
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_millis(250));
+            if let Err(_) = tx.send(Event::Injected(InjectedPayload::Gossip)) {
+                break;
+            }
+        });
+
         Ok(Self {
-            // node: init.node_id,
+            node: init.node_id,
             id: 0,
+            initial_nodes: init.node_ids,
             log: HashMap::new(),
-            count: 1,
+            count: 0,
             committed_offsets: HashMap::new(),
         })
     }
 
     fn handle_input(
         &mut self,
-        input: Event<Payload, ()>,
+        input: Event<Payload, InjectedPayload>,
         output: &mut std::io::StdoutLock,
     ) -> anyhow::Result<()> {
         match input {
             Event::EOF => {}
-            Event::Injected(..) => {
-                panic!("UNEXEPECTED INJECTED IN REPLICATED LOG")
-            }
+
+            Event::Injected(payload) => match payload {
+                InjectedPayload::Gossip => {
+                    for n in &self.initial_nodes {
+                        let msg: Message<Payload> = Message {
+                            src: self.node.clone(),
+                            dest: n.clone(),
+                            body: Body {
+                                id: Some(self.id),
+                                in_reply_to: None,
+                                payload: Payload::Gossip {
+                                    history: self.log.clone(),
+                                },
+                            },
+                        };
+                        msg.send_self(&mut *output)
+                            .context("failed to gossip replicated log in kafka/replicated")?;
+                        self.id += 1;
+                    }
+                }
+            },
+
             Event::Message(input) => {
                 let mut response = input.derive_response(Some(&mut self.id));
                 match response.body.payload {
+                    Payload::Gossip { history } => {
+                        for (log_key, gossip_vec) in history {
+                            let own_vec = self.log.entry(log_key).or_insert(HashSet::new());
+                            // let mut own_vec = own_vec.clone();
+                            own_vec.extend(gossip_vec);
+                            // own_vec.sort();
+                            self.count = own_vec.len();
+                        }
+                    }
+
                     Payload::Send { key, msg } => {
                         eprintln!("RECEIVED SEND for key {key}, message:{msg}");
-                        let key_set = self.log.entry(key).or_insert(Vec::new());
-                        key_set.push((self.count, msg));
+                        let key_set = self.log.entry(key).or_insert(HashSet::new());
+                        // key_set.push((self.count, msg));
+                        key_set.insert(msg);
                         eprintln!("current log after adding from send {:?}", &self.log);
                         eprintln!(" sending sendok with count {}", &self.count);
                         response.body.payload = Payload::SendOk { offset: self.count };
@@ -93,6 +148,7 @@ impl Node<(), Payload> for LogNode {
                         eprintln!("current log:{:?}", &self.log);
                         // let mut ret_map: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
                         let mut ret_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+                        // let mut ret_map: HashMap<String, Vec<usize>> = HashMap::new();
                         for (k, v) in offsets {
                             eprintln!("in poll offset loop, current key:{k}, value:{v}");
 
@@ -101,13 +157,11 @@ impl Node<(), Payload> for LogNode {
                                 continue;
                             };
                             eprintln!("in POLL, key set before:{:?}", &key_set);
-                            let mut ret_set: Vec<(usize, usize)> = key_set
-                                .clone() //remove clone
-                                .into_iter()
-                                .filter(|(log_key, _)| *log_key >= v)
-                                .collect();
+                            // let ret_set: Vec<usize> = key_set.clone().drain(v..).collect();
+                            let mut ret_set: Vec<usize> = key_set.clone().into_iter().collect(); 
 
                             ret_set.sort();
+                            let ret_set = ret_set.into_iter().enumerate().collect();
                             eprintln!("POLL result: after:{:?}", &ret_set);
                             ret_map.insert(k, ret_set);
                         }
