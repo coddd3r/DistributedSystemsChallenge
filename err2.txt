@@ -1,0 +1,16 @@
+{:key "57",
+                                    :values [2 8],
+                                    :delta 7,
+                                    :skipped (6 7 9 10 11 12),
+                                    :op #jepsen.history.Op{:index 4798,
+                                                           :time 12214857167,
+                                                           :type :ok,
+                                                           :process 2,
+                                                           :f :poll,
+                                                           :value [[:poll
+                                                                    {"57" [[451
+                                                                            2]
+                                                                           [496
+                                                                            8]
+                                                                           [518
+                                                                            13]]}]]}}

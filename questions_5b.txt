@@ -1,0 +1,25 @@
+are the offsets universal i.e all-nodes share an offset counter, are they log specific or are they node specific?
+why are so many of the poll requests empty?
+I get poll requests before the sends
+logic: Send:receive a send, add it to it's key in the log using as a tuple (offset, message) using, an offset(starts at 0),
+respond with send_ok(counter), counter += 1
+Poll: receive a poll request, search for the keys in my node's log, if not present ignore(?), 
+if present, filter out all offsets below the requested offset, return the rest of the (offset, message) pairs.
+
+I have tried debugging and it seems I receive a lot of poll requests before send requests that would have populated the keys in the former.
+ Here are my workload results:
+ :workload {:valid? false,
+            :worst-realtime-lag {:time 40.026181086,
+                                 :process 12,
+                                 :key "9",
+                                 :lag 39.495687539},
+            :bad-error-types (:inconsistent-offsets
+                              :int-poll-skip
+                              :poll-skip),
+            :error-types (:inconsistent-offsets
+                          :int-poll-skip
+                          :poll-skip),
+ 
+ 
+
+PS: I noticed maelstrom/doc/workloads on the github docs has different commands Read, Write and Cas. Do these matter for the tests?

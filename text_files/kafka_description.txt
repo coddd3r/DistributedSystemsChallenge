@@ -1,4 +1,4 @@
-"A simplified version of a Kafka-style stream processing system. Servers
+  "A simplified version of a Kafka-style stream processing system. Servers
   provide a set of append-only logs identified by string *keys*. Each integer
   *offset* in a log has one *message*. Offsets may be sparse: not every offset
   must contain a message.

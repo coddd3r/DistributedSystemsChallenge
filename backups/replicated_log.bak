@@ -38,7 +38,7 @@ struct LogNode {
     // node: String,
     id: usize,
     // log: HashMap<String, usize>,
-    log: HashMap<String, Vec<(usize, usize)>>,
+    log: HashMap<String, HashSet<(usize, usize)>>,
     count: usize,
     committed_offsets: HashMap<String, usize>,
 }
@@ -75,9 +75,11 @@ impl Node<(), Payload> for LogNode {
                 let mut response = input.derive_response(Some(&mut self.id));
                 match response.body.payload {
                     Payload::Send { key, msg } => {
-                        let key_set = self.log.entry(key).or_insert(Vec::new());
-                        // key_set.insert((self.count, msg));
-                        key_set.push((self.count, msg));
+                        eprintln!("received send for key {key}, message:{msg}");
+                        let key_set = self.log.entry(key).or_insert(HashSet::new());
+                        key_set.insert((self.count, msg));
+                        eprintln!(" sending sendok with count {}", &self.count);
+                        eprintln!("current log {:?}", &self.log);
                         response.body.payload = Payload::SendOk { offset: self.count };
                         response
                             .send_self(&mut *output)
@@ -87,22 +89,29 @@ impl Node<(), Payload> for LogNode {
                     }
 
                     Payload::Poll { offsets } => {
+                        eprintln!("received a poll with dictionary:{:?}", &offsets);
+                        eprintln!("current log:{:?}", &self.log);
                         // let mut ret_map: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
                         let mut ret_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
                         for (k, v) in offsets {
+                            eprintln!("IN POLL, offset loop, current key:{k}, value:{v}");
+
                             let Some(key_set) = self.log.get(&k) else {
                                 eprintln!("KEY: {k} NOT FOUND in {:?}", self.log);
                                 continue;
                             };
-                            let mut ret_set: Vec<(usize, usize)> = key_set
+                            eprintln!("in POLL, key set before:{:?}", &key_set);
+                            let mut     ret_set: Vec<(usize, usize)> = key_set
                                 .clone() //remove clone
                                 .into_iter()
                                 .filter(|(log_key, _)| *log_key >= v)
                                 .collect();
                             // let ret_set: Vec<(usize, usize)> = ret_set.s;
                             ret_set.sort();
+                            eprintln!("POLL result: after:{:?}", &ret_set);
                             ret_map.insert(k, ret_set);
                         }
+                        eprintln!("sending a poll with map: {:?}", &ret_map);
                         response.body.payload = Payload::PollOk { msgs: ret_map };
                         response
                             .send_self(&mut *output)
@@ -127,7 +136,6 @@ impl Node<(), Payload> for LogNode {
                             if let Some(val) = self.committed_offsets.get(&key) {
                                 ret_map.insert(key, val.clone());
                             } else {
-                                eprintln!("KEY NOT FOUND IN LIST COMMITTES OFFSETS");
                                 continue;
                             }
                         }

@@ -2,7 +2,7 @@ use ds_challenge::*;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -56,7 +56,7 @@ impl Node<(), Payload> for LogNode {
             // node: init.node_id,
             id: 0,
             log: HashMap::new(),
-            count: 0,
+            count: 1,
             committed_offsets: HashMap::new(),
         })
     }
@@ -75,34 +75,43 @@ impl Node<(), Payload> for LogNode {
                 let mut response = input.derive_response(Some(&mut self.id));
                 match response.body.payload {
                     Payload::Send { key, msg } => {
+                        eprintln!("RECEIVED SEND for key {key}, message:{msg}");
                         let key_set = self.log.entry(key).or_insert(Vec::new());
-                        // key_set.insert((self.count, msg));
                         key_set.push((self.count, msg));
+                        eprintln!("current log after adding from send {:?}", &self.log);
+                        eprintln!(" sending sendok with count {}", &self.count);
                         response.body.payload = Payload::SendOk { offset: self.count };
+                        self.count += 1;
+
                         response
                             .send_self(&mut *output)
                             .context("failed to respond to send request in replicated log")?;
-
-                        self.count += 1;
                     }
 
                     Payload::Poll { offsets } => {
+                        eprintln!("RECEIVED POLL with dictionary:{:?}", &offsets);
+                        eprintln!("current log:{:?}", &self.log);
                         // let mut ret_map: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
                         let mut ret_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
                         for (k, v) in offsets {
+                            eprintln!("in poll offset loop, current key:{k}, value:{v}");
+
                             let Some(key_set) = self.log.get(&k) else {
                                 eprintln!("KEY: {k} NOT FOUND in {:?}", self.log);
                                 continue;
                             };
+                            eprintln!("in POLL, key set before:{:?}", &key_set);
                             let mut ret_set: Vec<(usize, usize)> = key_set
                                 .clone() //remove clone
                                 .into_iter()
                                 .filter(|(log_key, _)| *log_key >= v)
                                 .collect();
-                            // let ret_set: Vec<(usize, usize)> = ret_set.s;
+
                             ret_set.sort();
+                            eprintln!("POLL result: after:{:?}", &ret_set);
                             ret_map.insert(k, ret_set);
                         }
+                        eprintln!("sending a poll with map: {:?}", &ret_map);
                         response.body.payload = Payload::PollOk { msgs: ret_map };
                         response
                             .send_self(&mut *output)
@@ -110,10 +119,14 @@ impl Node<(), Payload> for LogNode {
                     }
 
                     Payload::CommitOffsets { offsets } => {
+                        eprintln!("updating committed offsets: {:?}", offsets);
                         for (k, v) in offsets {
                             self.committed_offsets.insert(k, v);
                         }
-
+                        eprintln!(
+                            "recorded offsets after commit: {:?}",
+                            self.committed_offsets
+                        );
                         response.body.payload = Payload::CommitOffsetsOk;
                         response
                             .send_self(&mut *output)
@@ -121,16 +134,18 @@ impl Node<(), Payload> for LogNode {
                     }
 
                     Payload::ListCommittedOffsets { keys } => {
+                        eprintln!("received LIST commit offsets request with keys {:?}", &keys);
                         let mut ret_map: HashMap<String, usize> = HashMap::new();
                         for key in keys {
                             // if !self.committed_offsets.contains_key(&key) {continue;}
                             if let Some(val) = self.committed_offsets.get(&key) {
                                 ret_map.insert(key, val.clone());
                             } else {
-                                eprintln!("KEY NOT FOUND IN LIST COMMITTES OFFSETS");
+                                eprintln!("KEY NOT FOUND IN LIST COMMITTED OFFSETS");
                                 continue;
                             }
                         }
+                        eprintln!("returning committed offsets with map {:?}", ret_map);
                         response.body.payload =
                             Payload::ListCommittedOffsetsOk { offsets: ret_map };
                         response
