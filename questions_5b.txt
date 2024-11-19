@@ -1,11 +1,20 @@
-are the offsets universal i.e all-nodes share an offset counter, are they log specific or are they node specific?
+are the offsets universal i.e all-nodes share an offset counter, are they log specific or are they key specific?
 why are so many of the poll requests empty?
 I get poll requests before the sends
+assumptions: I know log key is unique and message key is unique and both are numbers, i have key * 1000 + message index in sorted vec as offset.
 logic: Send:receive a send, add it to it's key in the log using as a tuple (offset, message) using, an offset(starts at 0),
-respond with send_ok(counter), counter += 1
+respond with send_ok(counter), offset = key * 10000 + current index;
+how do I get duplicates when using  a hashset? 
 Poll: receive a poll request, search for the keys in my node's log, if not present ignore(?), 
 if present, filter out all offsets below the requested offset, return the rest of the (offset, message) pairs.
 
+ 
+What do I do with empty polls?
+Do offsets need to start at 0?
+How to merge offsets?
+
+
+PS: I noticed maelstrom/doc/workloads on the github docs has different commands Read, Write and Cas. Do these matter for the tests?
 I have tried debugging and it seems I receive a lot of poll requests before send requests that would have populated the keys in the former.
  Here are my workload results:
  :workload {:valid? false,
@@ -19,7 +28,3 @@ I have tried debugging and it seems I receive a lot of poll requests before send
             :error-types (:inconsistent-offsets
                           :int-poll-skip
                           :poll-skip),
- 
- 
-
-PS: I noticed maelstrom/doc/workloads on the github docs has different commands Read, Write and Cas. Do these matter for the tests?
