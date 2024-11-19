@@ -28,3 +28,35 @@ I have tried debugging and it seems I receive a lot of poll requests before send
             :error-types (:inconsistent-offsets
                           :int-poll-skip
                           :poll-skip),
+                          
+                          
+I have worked my way through the challenge steps and I am sort of stumped by 5b, especially the gossip/merge-offset logic. Here's what I basically do in my code:
+
+**assumptions**:
+1. log key and message key are unique and numbers,
+2. messages are sent in sequentially increasing order, so offsets can be represented as indexes in a sorted array
+3. offsets are log(key)-specific
+
+ **logic**: 
+Each Node keeps records in a Hashmap of log-key : Hashet(messages).   
+1.  Send:
+    * receive a send(key, message) and add it to its log's Hashet in the node's records 
+    * respond with send_ok(offset) where offset = key * 10000 + current message value;
+
+2.  Poll: 
+    * receive a poll request(key, offset), search for the log-key in my node's records
+    * if not present ignore(?)
+    * get message index by offset % 10,000 - 1
+    * if key present, filter out all offsets below the requested index, return the rest of the (offset, message) pairs.
+
+4. Gossip:
+    thread that send a gossip with own log every 250ms, nodes merge each key's hashet in       the received records with their own 
+
+-> Things I am unsure about:are the offsets universal i.e all nodes share an offset counter used for all logs and every message has a unique offset OR are offsets log(key) specific i.e only need to be unique and monotonic for messages in the log?
+-> Things  I have considered:
+
+1. using timestamp as offset: can be a problem with inconsistent clocks
+2. using a node specific increasing counter and storing values as (offset, msg) tuples, and merging between nodes by comparing messages with the same offset, shifting the higher value message offset up +1. Issue is, this will give inconsistent poll results after every merge
+
+**Question:**
+I get  6 errors in my analysis so can anyone help point out the flaw in my algorithm and/or point me to resources about merging algorithms for g-counters? Any help would be much appreciated.
