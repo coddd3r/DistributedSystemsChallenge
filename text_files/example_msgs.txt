@@ -1,5 +1,17 @@
 
 {"src": "c1","dest": "n1","body": {"msg_id": 1,"type": "init","node_id": "n1","node_ids": ["n1"]}}
+//WRONG
+{"dest": "n1","body": {"msg_id": 1,"type": "init","node_id": "n1","node_ids": ["n1"]}} 
 
-{"src": "c1","dest": "n1","body":{"type": "txn", "msg_id": 3,"txn": [["r", 1, null],["w", 1, 6],["w", 2, 9]]}}
+{"src": "c1","dest": "n1","body":{"msg_id": 3,"type": "txn", "txn": [["r", 1, null],["w", 1, 6],["w", 2, 9]]}}
+{"src": "c1","dest": "n1","body":{"type": "txn", "msg_id": "3","txn": [["r", "1", null],["w", "1", "6"],["w", "2", "9"]]}}
+{"dest": "n1","body":{"type": "txn", "msg_id": 3,"txn": [["r", 1, null],["w", 1, 6],["w", 2, 9]]}}
 
+
+{"src": "c1","dest": "n1","body": {"msg_id": 1,"type": "init","node_id": "n1","node_ids": ["n1"]}}
+{"src": "c1","dest": "n1","body":{"type": "txn", "msg_id": 3,"txn": [["r", "1", null],["w", "1", "6"],["w", "2", "9"]]}}
+
+
+
+{"src": "c1","dest": "n1","body": {"msg_id": 1,"type": "init","node_id": "n1","node_ids": ["n1"]}}
+{"src": "c1","dest": "n1","body": {"msg_id": 3,"type": "txn", "txn": [["r", 1, null],["w", 1, 6],["w", 2, 9]]}}

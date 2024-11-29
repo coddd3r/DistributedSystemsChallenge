@@ -147,6 +147,7 @@ where
         let stdin = std::io::stdin().lock();
         for line in stdin.lines() {
             let line = line.context("input from stdin could  not be read")?;
+            // eprintln!("got Message {}", &line);
             let input: Message<P> =
                 serde_json::from_str(&line).context("could not deserialize input line")?;
             if let Err(_) = tx.send(Event::Message(input)) {

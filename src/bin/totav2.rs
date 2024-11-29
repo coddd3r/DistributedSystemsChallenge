@@ -1,45 +1,8 @@
-use ds_challenge::*;
+use std::collections::HashMap;
 
 use anyhow::Context;
+use ds_challenge::*;
 use serde::{Deserialize, Serialize};
-// use serde_with::serde_as;
-use std::{collections::HashMap, fmt::Debug, usize};
-
-// #[derive(Debug, Clone)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(untagged)]
-enum TxnTypes {
-    String(String),
-    Usize(usize),
-    Null,
-}
-
-// impl Serialize for TxnTypes {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         match self {
-//             TxnTypes::String(c) => c.serialize(serializer),
-//             TxnTypes::Usize(k) => k.serialize(serializer),
-//             TxnTypes::Null => {}
-//         }
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for TxnTypes {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         let value: String = Deserialize::deserialize(deserializer)?;
-
-//         match value.parse::<usize>() {
-//             Ok(val) => Ok(TxnTypes::Usize(val)),
-//             Err(_) => Ok(TxnTypes::String(value)),
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,12 +10,12 @@ enum TxnTypes {
 enum Payload {
     Txn {
         msg_id: usize,
-        txn: Vec<Vec<TxnTypes>>,
+        txn: Vec<Vec<String>>,
     },
     TxnOk {
         msg_id: usize,
         in_reply_to: String,
-        txn: Vec<Vec<TxnTypes>>,
+        txn: Vec<Vec<String>>,
     },
 }
 
@@ -60,7 +23,7 @@ struct TxnNode {
     // node: String,
     id: usize,
     // initial_nodes: Vec<String>,
-    own_log: HashMap<usize, usize>,
+    own_log: HashMap<String, String>,
 }
 
 enum InjectedPayload {
@@ -93,38 +56,33 @@ impl Node<(), Payload, InjectedPayload> for TxnNode {
             Event::Injected(_) => {}
             Event::EOF => {}
             Event::Message(input) => {
+                eprintln!("received a message: {:?}", &input);
                 let mut response = input.derive_response(Some(&mut self.id));
                 match response.body.payload {
                     Payload::Txn { msg_id, txn } => {
                         let mut ret_txn: Vec<_> = Vec::new();
                         txn.iter().for_each(|tr| {
                             let mut tr = tr.iter();
-                            if let TxnTypes::String(op_name) = tr
-                                .next()
-                                .expect("There should be a transaction shortcut 'r' or 'w'")
-                            {
+                            if let Some(op_name) = tr.next() {
                                 if op_name == "w" {
-                                    if let (
-                                        Some(TxnTypes::Usize(key)),
-                                        Some(TxnTypes::Usize(msg)),
-                                    ) = (tr.next(), tr.next())
-                                    {
-                                        self.own_log.insert((*key).clone(), (*msg).clone());
+                                    if let (Some(key), Some(msg)) = (tr.next(), tr.next()) {
+                                        self.own_log.insert(key.clone(), msg.clone());
                                         ret_txn.push(vec![
-                                            TxnTypes::String(op_name.clone()),
-                                            TxnTypes::Usize(*key),
-                                            TxnTypes::Usize(*msg),
+                                            op_name.clone(),
+                                            key.to_string(),
+                                            msg.clone(),
                                         ]);
                                     }
                                 }
                                 if op_name == "r" {
-                                    if let Some(TxnTypes::Usize(key)) = tr.next() {
-                                        let ret = self.own_log.entry(*key).or_insert(0);
-                                        ret_txn.push(vec![
-                                            TxnTypes::String(op_name.clone()),
-                                            TxnTypes::Usize(*key),
-                                            TxnTypes::Usize(ret.clone()),
-                                        ])
+                                    if let Some(key) = tr.next() {
+                                        if let Some(msg) = self.own_log.get(key) {
+                                            ret_txn.push(vec![
+                                                op_name.clone(),
+                                                key.to_string(),
+                                                msg.clone(),
+                                            ]);
+                                        }
                                     }
                                 }
                             }
