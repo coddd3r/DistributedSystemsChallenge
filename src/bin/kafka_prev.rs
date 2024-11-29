@@ -23,8 +23,6 @@ enum Payload {
     },
     PollOk {
         msgs: HashMap<String, Vec<(usize, usize)>>,
-        // msgs: HashMap<String, Vec<usize>>,
-        // msgs: HashMap<String, HashSet<(usize, usize)>>,
     },
     CommitOffsets {
         offsets: HashMap<String, usize>,
@@ -37,9 +35,7 @@ enum Payload {
         offsets: HashMap<String, usize>,
     },
     Gossip {
-        // history: HashMap<String, Vec<(usize, usize)>>,
         history: HashMap<String, HashSet<usize>>,
-        // history: HashMap<String, Vec<usize>>,
     },
 }
 
@@ -50,13 +46,9 @@ enum InjectedPayload {
 struct RecordNode {
     node: String,
     id: usize,
-    // record: HashMap<String, usize>,
-    // record: HashMap<String, Vec<(usize, usize)>>,
-    // record: HashMap<String, Vec<usize>>,
-    record: HashMap<String, HashSet<usize>>,
-    // count: usize,
     initial_nodes: Vec<String>,
     committed_offsets: HashMap<String, usize>,
+    record: HashMap<String, HashSet<usize>>,
 }
 
 impl Node<(), Payload, InjectedPayload> for RecordNode {
@@ -79,9 +71,8 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
             node: init.node_id,
             id: 0,
             initial_nodes: init.node_ids,
-            record: HashMap::new(),
-            // count: 1,
             committed_offsets: HashMap::new(),
+            record: HashMap::new(),
         })
     }
 

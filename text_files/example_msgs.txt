@@ -1,22 +1,5 @@
 
 {"src": "c1","dest": "n1","body": {"msg_id": 1,"type": "init","node_id": "n1","node_ids": ["n1"]}}
 
-let mut response = input.derive_response(Some(&mut self.id));
-        match response.body.payload {
-            //generate a unique id for a message
-            Payload::Generate {} => {
-                // let guid = Ulid::new().to_string();
-                //{node-id}-{message_id} should always be unique
-                //assumes nodes do not reuse node-ids on restart
-                response.body.payload = Payload::GenerateOk {
-                    guid: format!(
-                        "{}-{}",
-                        self.id,
-                    ),
-                };
-                serde_json::to_writer(&mut *output, &response)?;
-                output.write_all(b"\n").context("write trailing newline")?;
-                self.id += 1;
-            }
-            Payload::GenerateOk { .. } => bail!("receievec generate ok message"),
-        }
+{"src": "c1","dest": "n1","body":{"type": "txn", "msg_id": 3,"txn": [["r", 1, null],["w", 1, 6],["w", 2, 9]]}}
+

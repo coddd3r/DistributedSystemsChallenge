@@ -20,8 +20,6 @@ enum Payload {
     },
     PollOk {
         msgs: HashMap<String, Vec<(usize, usize)>>,
-        // msgs: HashMap<String, Vec<usize>>,
-        // msgs: HashMap<String, HashSet<(usize, usize)>>,
     },
     CommitOffsets {
         offsets: HashMap<String, usize>,
@@ -85,7 +83,7 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
 
             Event::Injected(payload) => match payload {
                 InjectedPayload::Gossip => {
-                    eprintln!("GOSSIPING");
+                    //eprintln!("GOSSIPING");
                     for n in &self.initial_nodes {
                         let msg: Message<Payload> = Message {
                             src: self.node.clone(),
@@ -98,7 +96,7 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
                                 },
                             },
                         };
-                        eprintln!("sending gossip with maxes{:?}", &self.current_max);
+                        //eprintln!("sending gossip with maxes{:?}", &self.current_max);
                         msg.send_self(&mut *output)
                             .context("failed to gossip replicated record in kafka/replicated")?;
                         self.id += 1;
@@ -110,25 +108,22 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
                 let mut response = input.derive_response(Some(&mut self.id));
                 match response.body.payload {
                     Payload::Gossip { gossip_max } => {
-                        eprintln!("received gossip, with max_map {:?}", &gossip_max);
-                        eprintln!("current maxes before merge {:?}", &self.current_max);
+                        //eprintln!("received gossip, with max_map {:?}", &gossip_max);
+                        //eprintln!("current maxes before merge {:?}", &self.current_max);
                         for (log_key, max_msg) in gossip_max {
                             let own_max = self.current_max.entry(log_key).or_insert(0);
                             *own_max = max_msg.max(*own_max);
                         }
-                        eprintln!("maxes after gossip{:?}", &self.current_max);
+                        //eprintln!("maxes after gossip{:?}", &self.current_max);
                     }
 
                     Payload::Send { key, msg } => {
-                        eprintln!("RECEIVED SEND for key {key}, message:{msg}");
+                        //eprintln!("RECEIVED SEND for key {key}, message:{msg}");
                         let mut send_offset = &key.parse::<usize>().unwrap() * 10000;
-                        // let key_max = self.current_max.entry(key).or_insert(0);
-                        // *key_max = msg.max(*key_max);
-                        // *key_max = msg;
                         self.current_max.insert(key, msg);
                         send_offset += msg;
-                        eprintln!("current max after adding from send {:?}", self.current_max);
-                        eprintln!("sending send_ok with offset {}", &send_offset);
+                        //eprintln!("current max after adding from send {:?}", self.current_max);
+                        //eprintln!("sending send_ok with offset {}", &send_offset);
                         response.body.payload = Payload::SendOk {
                             offset: send_offset,
                         };
@@ -139,35 +134,32 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
                     }
 
                     Payload::Poll { offsets } => {
-                        eprintln!("RECEIVED POLL with dictionary:{:?}", &offsets);
-                        eprintln!("current maxes:{:?}", &self.current_max);
+                        //eprintln!("RECEIVED POLL with dictionary:{:?}", &offsets);
+                        //eprintln!("current maxes:{:?}", &self.current_max);
                         let mut ret_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
+
                         for (k, val) in offsets {
                             let v = val % 10000;
-                            eprintln!("in poll offset loop, current key:{k}, value:{v}");
+                            //eprintln!("in poll offset loop, current key:{k}, value:{v}");
 
                             let Some(key_max) = self.current_max.get(&k) else {
-                                eprintln!("KEY: {k} NOT FOUND in {:?}", self.current_max);
+                                //eprintln!("KEY: {k} NOT FOUND in {:?}", self.current_max);
                                 continue;
                             };
-                            eprintln!("in POLL, key max before:{:?}", &key_max);
+                            //eprintln!("in POLL, key max before:{:?}", &key_max);
                             let key_offset = k.parse::<usize>().unwrap() * 10000;
-                            // let key_offset = (val / 10000) * 10000;
                             let mut fin_set: Vec<_> = Vec::new();
 
                             let v = v.max(1);
-                            if v > *key_max {
-                                continue;
-                            }
-                            for i in v..=*key_max {
+                            for i in v..*key_max + 1 {
                                 fin_set.push((i + key_offset, i));
                             }
 
-                            eprintln!("POLL result: after:{:?}", &fin_set);
+                            //eprintln!("POLL result: after:{:?}", &fin_set);
                             ret_map.insert(k, fin_set);
                         }
 
-                        eprintln!("RESPONDING to a poll with map: {:?}", &ret_map);
+                        //eprintln!("RESPONDING to a poll with map: {:?}", &ret_map);
                         response.body.payload = Payload::PollOk { msgs: ret_map };
                         response
                             .send_self(&mut *output)
@@ -175,14 +167,14 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
                     }
 
                     Payload::CommitOffsets { offsets } => {
-                        eprintln!("updating committed offsets: {:?}", offsets);
+                        //eprintln!("updating committed offsets: {:?}", offsets);
                         for (k, v) in offsets {
                             self.committed_offsets.insert(k, v);
                         }
-                        eprintln!(
-                            "recorded offsets after commit: {:?}",
-                            self.committed_offsets
-                        );
+                        //eprintln!(
+                        //     "recorded offsets after commit: {:?}",
+                        //     self.committed_offsets
+                        // );
                         response.body.payload = Payload::CommitOffsetsOk;
                         response
                             .send_self(&mut *output)
@@ -190,18 +182,18 @@ impl Node<(), Payload, InjectedPayload> for RecordNode {
                     }
 
                     Payload::ListCommittedOffsets { keys } => {
-                        eprintln!("received LIST commit offsets request with keys {:?}", &keys);
-                        eprintln!("committed offsets before:{:?}", &self.committed_offsets);
+                        //eprintln!("received LIST commit offsets request with keys {:?}", &keys);
+                        //eprintln!("committed offsets before:{:?}", &self.committed_offsets);
                         let mut ret_map: HashMap<String, usize> = HashMap::new();
                         for key in keys {
                             if let Some(val) = self.committed_offsets.get(&key) {
                                 ret_map.insert(key, val.clone());
                             } else {
-                                eprintln!("KEY NOT FOUND IN LIST COMMITTED OFFSETS");
+                                //eprintln!("KEY NOT FOUND IN LIST COMMITTED OFFSETS");
                                 continue;
                             }
                         }
-                        eprintln!("returning committed offsets with map {:?}", ret_map);
+                        //eprintln!("returning committed offsets with map {:?}", ret_map);
                         response.body.payload =
                             Payload::ListCommittedOffsetsOk { offsets: ret_map };
                         response
