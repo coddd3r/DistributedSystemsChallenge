@@ -52,7 +52,7 @@ pub struct Body<Payload> {
     pub payload: Payload,
 }
 
-//handle init message that sends a lsit of nodes and this current nodes id
+//handle init message that sends a list of nodes and this current nodes id
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Init {
     pub node_id: String,
