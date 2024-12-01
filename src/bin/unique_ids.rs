@@ -1,3 +1,7 @@
+/* 
+    unique-ids challenge 2
+*/
+
 use ds_challenge::*;
 use std::io::StdoutLock;
 

@@ -1,3 +1,7 @@
+/*
+    challenge 5 kafka style log
+*/
+
 use ds_challenge::*;
 
 use anyhow::Context;

@@ -1,3 +1,7 @@
+/* 
+    echo challenge 1 
+*/
+
 use ds_challenge::*;
 use std::io::StdoutLock;
 
@@ -11,7 +15,7 @@ use serde::{Deserialize, Serialize};
 enum Payload {
     Echo { echo: String },
     EchoOk { echo: String },
-    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EchoNode {

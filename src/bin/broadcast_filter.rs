@@ -1,3 +1,10 @@
+/*
+Broadcast with filtered gossip, reduces msgs-per-op significantly
+Challenge 3, fly.io distributed systems challenge
+*/
+
+
+
 use ds_challenge::*;
 use std::{
     collections::{HashMap, HashSet},
@@ -129,6 +136,7 @@ impl Node<(), Payload, InjectedPayload> for BroadcastNode {
                 InjectedPayload::Gossip => {
                     for n in &self.neighbourhood {
                         let known_messages = &self.known[n];
+                        //get already known as messages that are not already known by node n
                         let (already_known, mut notify_of): (HashSet<_>, HashSet<_>) = self
                             .messages
                             .iter()
@@ -136,6 +144,7 @@ impl Node<(), Payload, InjectedPayload> for BroadcastNode {
                             .partition(|m| !known_messages.contains(m));
                         // .collect();
 
+			//randomly pick half and at least 10 values to gossip
                         let mut rng = rand::thread_rng();
                         notify_of.extend(already_known.iter().filter(|_| {
                             // rng.gen_bool(0.1)

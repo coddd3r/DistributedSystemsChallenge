@@ -1,3 +1,8 @@
+/*
+    Challenge 6:Totally-available
+    passes all tests 6a, 6b, 6c
+*/
+
 use ds_challenge::*;
 
 use anyhow::Context;
